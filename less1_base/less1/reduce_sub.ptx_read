@@ -1,0 +1,75 @@
+代码ptx 详细解读
+
+
+.version 8.7
+.target sm_52
+.address_size 64
+
+	// .globl	_Z10reduce_subPiS_i
+
+.visible .entry _Z10reduce_subPiS_i(
+	.param .u64 _Z10reduce_subPiS_i_param_0,
+	.param .u64 _Z10reduce_subPiS_i_param_1,
+	.param .u32 _Z10reduce_subPiS_i_param_2
+)
+
+// 这是CUDA内核函数的PTX汇编入口声明。
+`.visible.entry` 表示全局可见的入口函数，对应原CUDA内核函数`void reduce_sub(int* , int* , int)` 。
+`_Z10` 后的函数名经过C++名称修饰（name mangling），
+参数使用`.u64` 类型表示指针（64位地址），
+`.u32` 表示整型参数，符合CUDA内核的参数传递规范。
+
+{
+	.reg .pred 	%p<2>; 
+	.reg .b32 	%r<9>;
+	.reg .b64 	%rd<8>;
+// .reg 是声明寄存器资源
+// .pred 是谓词寄存器判断
+// `.reg .b32 %r<9>` 声明9个32位整型寄存器（用于线程索引计算）
+// .reg .b64 	%rd<8>; 声明8个64位整型寄存器（用于内存地址判断）
+
+	ld.param.u64 	%rd1, [_Z10reduce_subPiS_i_param_0];
+	ld.param.u64 	%rd2, [_Z10reduce_subPiS_i_param_1];
+	ld.param.u32 	%r2, [_Z10reduce_subPiS_i_param_2];
+// 参数初始化
+// %rd1 %rd2 %r2 对应 ->  int* input,int* output,int n
+
+	mov.u32 	%r3, %ntid.x;
+	mov.u32 	%r4, %ctaid.x;
+	mov.u32 	%r5, %tid.x;
+	mad.lo.s32 	%r1, %r3, %r4, %r5;
+//  mad.lo.s32  乘加指令
+// int tid = blockDim.x*blockIdx.x + threadIdx.x;
+
+	setp.ge.s32 	%p1, %r1, %r2;
+	@%p1 bra 	$L__BB0_2;
+// 越界判断
+
+	cvta.to.global.u64 	%rd3, %rd2;
+// 将%rd2  转为全局内存地址 保存到 %rd3中 
+
+	mul.wide.s32 	%rd4, %r1, 4;
+// tid*sizeof(int) 位移 4字节
+
+	add.s64 	%rd5, %rd3, %rd4;
+//  input 地址计算 即 input[i]
+
+	cvta.to.global.u64 	%rd6, %rd1;
+	add.s64 	%rd7, %rd6, %rd4;
+// output 地址计算
+
+	ld.global.u32 	%r6, [%rd7];
+	ld.global.u32 	%r7, [%rd5];
+// 同样 将对应的数 加载到 寄存器 %r7,%r6
+
+	sub.s32 	%r8, %r7, %r6;
+// 相减
+
+	st.global.u32 	[%rd5], %r8;
+// 计算结果 返回到 %rd5 数组中
+
+
+$L__BB0_2:
+	ret;
+
+}

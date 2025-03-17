@@ -1,0 +1,9 @@
+命令行
+
+nvcc -o reduce_sub.exe reduce_sub.cu
+
+./reduce_sub.exe
+
+ptx 指令保存：
+nvcc -ptx --keep reduce_sub.cu
+

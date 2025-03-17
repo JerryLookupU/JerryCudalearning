@@ -1,0 +1,25 @@
+# 系统临时文件
+*.log
+Thumbs.db
+
+# IDE配置文件
+.vs/
+.idea/
+
+# 编译产物
+bin/
+obj/
+
+# NuGet包目录
+packages/
+
+# Python虚拟环境
+venv/
+
+# 其他常见排除项
+*.user
+*.pdb
+publish/
+*.cpp1.ii.res
+*.cpp1.ii
+*.exe
