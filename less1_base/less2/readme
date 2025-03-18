@@ -33,3 +33,53 @@ Optimized Version | Size: 1048576 | Block: 512 | Time: 0.0328352ms | Bandwidth: 
 从性能测试结果来看，优化后的内核在部分尺寸下带宽显著提升（如65536尺寸下从58GB/s提升到78GB/s），
 但在大尺寸时反而下降。这可能与共享内存使用方式、循环展开策略以及线程调度有关。
 需要检查内核中共享内存的bank冲突情况、全局内存访问模式是否合并、以及warp调度效率等关键优
+
+测试 n 路展开情况
+4 rows | Block Size: 256 | Data Volume: 1024 | Average Time: 0.005472ms | Bandwidth: 1497.08GB/s
+4 rows | Block Size: 512 | Data Volume: 1024 | Average Time: 0.0130336ms | Bandwidth: 628.529GB/s
+8 rows | Block Size: 256 | Data Volume: 1024 | Average Time: 0.0112384ms | Bandwidth: 728.929GB/s
+8 rows | Block Size: 512 | Data Volume: 1024 | Average Time: 0.008304ms | Bandwidth: 986.513GB/s
+16 rows | Block Size: 256 | Data Volume: 1024 | Average Time: 0.0078752ms | Bandwidth: 1040.23GB/s
+16 rows | Block Size: 512 | Data Volume: 1024 | Average Time: 0.0182752ms | Bandwidth: 448.258GB/s
+32 rows | Block Size: 256 | Data Volume: 1024 | Average Time: 0.0120352ms | Bandwidth: 680.67GB/s
+32 rows | Block Size: 512 | Data Volume: 1024 | Average Time: 0.0125632ms | Bandwidth: 652.063GB/s
+4 rows | Block Size: 256 | Data Volume: 4096 | Average Time: 0.0107456ms | Bandwidth: 3049.43GB/s
+4 rows | Block Size: 512 | Data Volume: 4096 | Average Time: 0.006816ms | Bandwidth: 4807.51GB/s
+8 rows | Block Size: 256 | Data Volume: 4096 | Average Time: 0.0091552ms | Bandwidth: 3579.17GB/s
+8 rows | Block Size: 512 | Data Volume: 4096 | Average Time: 0.0132224ms | Bandwidth: 2478.22GB/s
+16 rows | Block Size: 256 | Data Volume: 4096 | Average Time: 0.0084192ms | Bandwidth: 3892.06GB/s
+16 rows | Block Size: 512 | Data Volume: 4096 | Average Time: 0.0113728ms | Bandwidth: 2881.26GB/s
+32 rows | Block Size: 256 | Data Volume: 4096 | Average Time: 0.0084576ms | Bandwidth: 3874.39GB/s
+32 rows | Block Size: 512 | Data Volume: 4096 | Average Time: 0.0100704ms | Bandwidth: 3253.89GB/s
+4 rows | Block Size: 256 | Data Volume: 16384 | Average Time: 0.0047072ms | Bandwidth: 27845GB/s
+4 rows | Block Size: 512 | Data Volume: 16384 | Average Time: 0.012896ms | Bandwidth: 10163.8GB/s
+8 rows | Block Size: 256 | Data Volume: 16384 | Average Time: 0.0119648ms | Bandwidth: 10954.8GB/s
+8 rows | Block Size: 512 | Data Volume: 16384 | Average Time: 0.0141728ms | Bandwidth: 9248.14GB/s
+16 rows | Block Size: 256 | Data Volume: 16384 | Average Time: 0.0045664ms | Bandwidth: 28703.6GB/s
+16 rows | Block Size: 512 | Data Volume: 16384 | Average Time: 0.0086976ms | Bandwidth: 15069.9GB/s
+32 rows | Block Size: 256 | Data Volume: 16384 | Average Time: 0.0140576ms | Bandwidth: 9323.92GB/s
+32 rows | Block Size: 512 | Data Volume: 16384 | Average Time: 0.0138752ms | Bandwidth: 9446.5GB/s
+4 rows | Block Size: 256 | Data Volume: 65536 | Average Time: 0.0078272ms | Bandwidth: 66982.8GB/s
+4 rows | Block Size: 512 | Data Volume: 65536 | Average Time: 0.0098528ms | Bandwidth: 53212.1GB/s
+8 rows | Block Size: 256 | Data Volume: 65536 | Average Time: 0.009824ms | Bandwidth: 53368.1GB/s
+8 rows | Block Size: 512 | Data Volume: 65536 | Average Time: 0.0128992ms | Bandwidth: 40645GB/s
+16 rows | Block Size: 256 | Data Volume: 65536 | Average Time: 0.0097024ms | Bandwidth: 54036.9GB/s
+16 rows | Block Size: 512 | Data Volume: 65536 | Average Time: 0.0074688ms | Bandwidth: 70197.1GB/s
+32 rows | Block Size: 256 | Data Volume: 65536 | Average Time: 0.0119488ms | Bandwidth: 43877.9GB/s
+32 rows | Block Size: 512 | Data Volume: 65536 | Average Time: 0.009632ms | Bandwidth: 54431.9GB/s
+4 rows | Block Size: 256 | Data Volume: 262144 | Average Time: 0.0095648ms | Bandwidth: 219257GB/s
+4 rows | Block Size: 512 | Data Volume: 262144 | Average Time: 0.0109408ms | Bandwidth: 191682GB/s
+8 rows | Block Size: 256 | Data Volume: 262144 | Average Time: 0.0098144ms | Bandwidth: 213681GB/s
+8 rows | Block Size: 512 | Data Volume: 262144 | Average Time: 0.0148928ms | Bandwidth: 140816GB/s
+16 rows | Block Size: 256 | Data Volume: 262144 | Average Time: 0.0090016ms | Bandwidth: 232975GB/s
+16 rows | Block Size: 512 | Data Volume: 262144 | Average Time: 0.010128ms | Bandwidth: 207065GB/s
+32 rows | Block Size: 256 | Data Volume: 262144 | Average Time: 0.0104416ms | Bandwidth: 200846GB/s
+32 rows | Block Size: 512 | Data Volume: 262144 | Average Time: 0.0138656ms | Bandwidth: 151249GB/s
+4 rows | Block Size: 256 | Data Volume: 1048576 | Average Time: 0.018224ms | Bandwidth: 460306GB/s
+4 rows | Block Size: 512 | Data Volume: 1048576 | Average Time: 0.0295712ms | Bandwidth: 283675GB/s
+8 rows | Block Size: 256 | Data Volume: 1048576 | Average Time: 0.017296ms | Bandwidth: 485003GB/s
+8 rows | Block Size: 512 | Data Volume: 1048576 | Average Time: 0.0277856ms | Bandwidth: 301905GB/s
+16 rows | Block Size: 256 | Data Volume: 1048576 | Average Time: 0.0172416ms | Bandwidth: 486533GB/s
+16 rows | Block Size: 512 | Data Volume: 1048576 | Average Time: 0.0270592ms | Bandwidth: 310010GB/s
+32 rows | Block Size: 256 | Data Volume: 1048576 | Average Time: 0.0223904ms | Bandwidth: 374652GB/s
+32 rows | Block Size: 512 | Data Volume: 1048576 | Average Time: 0.0272896ms | Bandwidth: 307392GB/s

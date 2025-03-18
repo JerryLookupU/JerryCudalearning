@@ -1,8 +1,14 @@
 #include <iostream>
+#include <locale>
 #include <cuda_runtime.h>
 #include <vector>
 
+// 声明不同展开次数的内核
 extern "C" __global__ void reduce_sub(int* input, int* output, int n);
+extern "C" __global__ void reduce_sub8(int* input, int* output, int n);
+extern "C" __global__ void reduce_sub16(int* input, int* output, int n);
+extern "C" __global__ void reduce_sub32(int* input, int* output, int n);
+
 
 #define CHECK(call) {\
   const cudaError_t err = call;\
@@ -21,65 +27,71 @@ void test_performance() {
   CHECK(cudaEventCreate(&start));
   CHECK(cudaEventCreate(&stop));
 
+  // 调整for循环内代码块的缩进，确保逻辑清晰
   for (auto size : test_sizes) {
-    int *d_input, *d_output;
-    size_t bytes = size * sizeof(int);
-    
-    CHECK(cudaMalloc(&d_input, bytes));
-    CHECK(cudaMalloc(&d_output, bytes));
-    
-    CHECK(cudaMemset(d_input, 1, bytes));
-    CHECK(cudaMemset(d_output, 0, bytes));
-
-    for (auto block_size : block_sizes) {
-      float total_time = 0;
-      int grid_size = (size + block_size - 1) / block_size;
-
-      reduce_sub<<<grid_size, block_size>>>(d_input, d_output, size);
-      CHECK(cudaDeviceSynchronize());
-
-      for (int t = 0; t < trials; ++t) {
-        CHECK(cudaEventRecord(start));
-        reduce_sub<<<grid_size, block_size>>>(d_input, d_output, size);
-        CHECK(cudaEventRecord(stop));
-        CHECK(cudaEventSynchronize(stop));
-        
-        float milliseconds = 0;
-        CHECK(cudaEventElapsedTime(&milliseconds, start, stop));
-        total_time += milliseconds;
-      }
-
-      float avg_time = total_time / trials;
-      float bandwidth = (2.0f * bytes * 1e-6) / (avg_time / 1e3);
+      int *d_input, *d_output;
+      size_t bytes = size * sizeof(int);
       
-      std::cout << "Optimized Version | Size: " << size 
-                << " | Block: " << block_size
-                << " | Time: " << avg_time << "ms"
-                << " | Bandwidth: " << bandwidth << "GB/s\n";
-    }
-
-    CHECK(cudaFree(d_input));
-    CHECK(cudaFree(d_output));
+      CHECK(cudaMalloc(&d_input, bytes));
+      CHECK(cudaMalloc(&d_output, bytes));
+      
+      CHECK(cudaMemset(d_input, 1, bytes));
+      CHECK(cudaMemset(d_output, 0, bytes));
+  
+      // 测试不同版本的内核
+      const std::vector<std::pair<void(*)(int*,int*,int), std::string>> kernels = {
+          {reduce_sub, "4 rows"},
+          {reduce_sub8, "8 rows"},
+          {reduce_sub16, "16 rows"},
+          {reduce_sub32, "32 rows"}
+      };
+  
+      for (const auto& kernel_pair : kernels) {
+          auto kernel_func = kernel_pair.first;
+          auto kernel_name = kernel_pair.second;
+          for (auto block_size : block_sizes) {
+        float total_time = 0;
+        int grid_size = (size + block_size - 1) / block_size;
+  
+        kernel_func<<<grid_size, block_size>>>(d_input, d_output, size);
+        CHECK(cudaDeviceSynchronize());
+  
+        for (int t = 0; t < trials; ++t) {
+          CHECK(cudaEventRecord(start));
+          kernel_func<<<grid_size, block_size>>>(d_input, d_output, size);
+          CHECK(cudaEventRecord(stop));
+          CHECK(cudaEventSynchronize(stop));
+          
+          float milliseconds = 0;
+          CHECK(cudaEventElapsedTime(&milliseconds, start, stop));
+          total_time += milliseconds;
+        }
+  
+        float avg_time = total_time / trials;
+        float bandwidth = (2.0f * bytes * 1e-6) / (avg_time / 1e3);
+        
+        std::cout << kernel_name << " | Block Size: " << block_size << " | Data Volume: " << size 
+                  << " | Average Time: " << avg_time << "ms"
+                  << " | Bandwidth: " << bandwidth << "GB/s\n";
+          }
+      }
+      
+      
+  
+      CHECK(cudaFree(d_input));
+      CHECK(cudaFree(d_output));
+      d_input = nullptr;
+      d_output = nullptr;
   }
 
-  CHECK(cudaEventDestroy(start));
-  CHECK(cudaEventDestroy(stop));
-}
+    CHECK(cudaEventDestroy(start));
+    CHECK(cudaEventDestroy(stop));
+    cudaDeviceReset();
+  }
 
-int main() {
-  test_performance();
-  return 0;
-}
-
-// Optimized Version | Size: 1024 | Block: 256 | Time: 0.0101024ms | Bandwidth: 810.896GB/s
-// Optimized Version | Size: 1024 | Block: 512 | Time: 0.0114816ms | Bandwidth: 713.489GB/s
-// Optimized Version | Size: 4096 | Block: 256 | Time: 0.0058816ms | Bandwidth: 5571.27GB/s
-// Optimized Version | Size: 4096 | Block: 512 | Time: 0.009536ms | Bandwidth: 3436.24GB/s
-// Optimized Version | Size: 16384 | Block: 256 | Time: 0.0045024ms | Bandwidth: 29111.6GB/s
-// Optimized Version | Size: 16384 | Block: 512 | Time: 0.0096288ms | Bandwidth: 13612.5GB/s
-// Optimized Version | Size: 65536 | Block: 256 | Time: 0.0067072ms | Bandwidth: 78167.9GB/s
-// Optimized Version | Size: 65536 | Block: 512 | Time: 0.0076192ms | Bandwidth: 68811.4GB/s
-// Optimized Version | Size: 262144 | Block: 256 | Time: 0.0100096ms | Bandwidth: 209514GB/s
-// Optimized Version | Size: 262144 | Block: 512 | Time: 0.0117056ms | Bandwidth: 179158GB/s
-// Optimized Version | Size: 1048576 | Block: 256 | Time: 0.0195424ms | Bandwidth: 429252GB/s
-// Optimized Version | Size: 1048576 | Block: 512 | Time: 0.0328352ms | Bandwidth: 255476GB/s
+  int main() {
+    std::locale::global(std::locale(""));
+    std::wcout.imbue(std::locale());
+    test_performance();
+    return 0;
+  }

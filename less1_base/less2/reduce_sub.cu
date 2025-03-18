@@ -24,6 +24,75 @@ extern "C" __global__ void reduce_sub(int* input, int* output, int n) {
     }
 }
 
+extern "C" __global__ void reduce_sub8(int* input, int* output, int n) {
+    __shared__ int s_data[256];
+    
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int local_idx = threadIdx.x;
+    
+    // 使用共享内存缓存输入数据
+    if (tid < n) {
+        s_data[local_idx] = input[tid];
+    }
+    __syncthreads();
+    
+    // 展开8路计算减少分支
+    if (tid < n) {
+        int val = output[tid];
+        #pragma unroll 8
+        for(int offset = 0; offset < blockDim.x; offset += warpSize) {
+            val -= s_data[(local_idx + offset) % blockDim.x];
+        }
+        output[tid] = val;
+    }
+}
+
+extern "C" __global__ void reduce_sub16(int* input, int* output, int n) {
+    __shared__ int s_data[256];
+    
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int local_idx = threadIdx.x;
+    
+    // 使用共享内存缓存输入数据
+    if (tid < n) {
+        s_data[local_idx] = input[tid];
+    }
+    __syncthreads();
+    
+    // 展开16路计算减少分支
+    if (tid < n) {
+        int val = output[tid];
+        #pragma unroll 16
+        for(int offset = 0; offset < blockDim.x; offset += warpSize) {
+            val -= s_data[(local_idx + offset) % blockDim.x];
+        }
+        output[tid] = val;
+    }
+}
+
+extern "C" __global__ void reduce_sub32(int* input, int* output, int n) {
+    __shared__ int s_data[256];
+    
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int local_idx = threadIdx.x;
+    
+    // 使用共享内存缓存输入数据
+    if (tid < n) {
+        s_data[local_idx] = input[tid];
+    }
+    __syncthreads();
+    
+    // 展开32路计算减少分支
+    if (tid < n) {
+        int val = output[tid];
+        #pragma unroll 32
+        for(int offset = 0; offset < blockDim.x; offset += warpSize) {
+            val -= s_data[(local_idx + offset) % blockDim.x];
+        }
+        output[tid] = val;
+    }
+}
+
 // int main() {
 //     const int dim = 4;
 //     int *h_input, *h_output;
