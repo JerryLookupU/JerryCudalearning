@@ -1,0 +1,35 @@
+less1 中的 perf 指标如下：
+// Size: 1024 | Block: 256 | Time: 0.0046848ms | Bandwidth: 1748.63GB/s
+// Size: 1024 | Block: 512 | Time: 0.0114656ms | Bandwidth: 714.485GB/s
+// Size: 4096 | Block: 256 | Time: 0.0096896ms | Bandwidth: 3381.77GB/s
+// Size: 4096 | Block: 512 | Time: 0.0075424ms | Bandwidth: 4344.51GB/s
+// Size: 16384 | Block: 256 | Time: 0.0103872ms | Bandwidth: 12618.6GB/s
+// Size: 16384 | Block: 512 | Time: 0.0098016ms | Bandwidth: 13372.5GB/s
+// Size: 65536 | Block: 256 | Time: 0.0089856ms | Bandwidth: 58347.6GB/s
+// Size: 65536 | Block: 512 | Time: 0.009872ms | Bandwidth: 53108.6GB/s
+
+// Size: 262144 | Block: 256 | Time: 0.0115072ms | Bandwidth: 182247GB/s
+// Size: 262144 | Block: 512 | Time: 0.011216ms | Bandwidth: 186979GB/s
+
+// Size: 1048576 | Block: 256 | Time: 0.0093824ms | Bandwidth: 894079GB/s
+// Size: 1048576 | Block: 512 | Time: 0.0100096ms | Bandwidth: 838056GB/s
+
+less2 中的 perf 指标如下
+Optimized Version | Size: 1024 | Block: 256 | Time: 0.0101024ms | Bandwidth: 810.896GB/s
+Optimized Version | Size: 1024 | Block: 512 | Time: 0.0114816ms | Bandwidth: 713.489GB/s
+Optimized Version | Size: 4096 | Block: 256 | Time: 0.0058816ms | Bandwidth: 5571.27GB/s
+Optimized Version | Size: 4096 | Block: 512 | Time: 0.009536ms | Bandwidth: 3436.24GB/s
+Optimized Version | Size: 16384 | Block: 256 | Time: 0.0045024ms | Bandwidth: 29111.6GB/s
+Optimized Version | Size: 16384 | Block: 512 | Time: 0.0096288ms | Bandwidth: 13612.5GB/s
+Optimized Version | Size: 65536 | Block: 256 | Time: 0.0067072ms | Bandwidth: 78167.9GB/s
+Optimized Version | Size: 65536 | Block: 512 | Time: 0.0076192ms | Bandwidth: 68811.4GB/s
+
+Optimized Version | Size: 262144 | Block: 256 | Time: 0.0100096ms | Bandwidth: 209514GB/s
+Optimized Version | Size: 262144 | Block: 512 | Time: 0.0117056ms | Bandwidth: 179158GB/s
+
+Optimized Version | Size: 1048576 | Block: 256 | Time: 0.0195424ms | Bandwidth: 429252GB/s
+Optimized Version | Size: 1048576 | Block: 512 | Time: 0.0328352ms | Bandwidth: 255476GB/s
+
+从性能测试结果来看，优化后的内核在部分尺寸下带宽显著提升（如65536尺寸下从58GB/s提升到78GB/s），
+但在大尺寸时反而下降。这可能与共享内存使用方式、循环展开策略以及线程调度有关。
+需要检查内核中共享内存的bank冲突情况、全局内存访问模式是否合并、以及warp调度效率等关键优
