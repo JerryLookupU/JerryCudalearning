@@ -24,3 +24,4 @@ publish/
 *.cpp1.ii
 *.exe
 *.lib
+*.exp
