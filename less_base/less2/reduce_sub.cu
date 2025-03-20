@@ -1,28 +1,7 @@
 #include <iostream>
 #include <cuda_runtime.h>
 
-extern "C" __global__ void reduce_sub(int* input, int* output, int n) {
-    __shared__ int s_data[256];
-    
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    int local_idx = threadIdx.x;
-    
-    // 使用共享内存缓存输入数据
-    if (tid < n) {
-        s_data[local_idx] = input[tid];
-    }
-    __syncthreads();
-    
-    // 展开四路计算减少分支
-    if (tid < n) {
-        int val = output[tid];
-        #pragma unroll 4
-        for(int offset = 0; offset < blockDim.x; offset += warpSize) {
-            val -= s_data[(local_idx + offset) % blockDim.x];
-        }
-        output[tid] = val;
-    }
-}
+
 
 extern "C" __global__ void reduce_sub8(int* input, int* output, int n) {
     __shared__ int s_data[256];
