@@ -1,0 +1,27 @@
+这两个CUDA原子操作函数<mcsymbol name="atomic_add_release_sys_global" filename="atom_add_global.cu" path="d:\code\jerrycudalearning\less_base\less6\atom_add_global.cu" startline="2" type="function"></mcsymbol>和<mcsymbol name="atomic_add_release_global" filename="atom_add_global.cu" path="d:\code\jerrycudalearning\less_base\less6\atom_add_global.cu" startline="7" type="function"></mcsymbol>的主要区别在于内存一致性和作用域：
+
+1. `atomic_add_release_sys_global`:
+   - 使用`.sys`修饰符：表示系统级内存一致性，适用于多GPU或CPU-GPU协同计算场景
+   - 保证操作对所有系统组件(包括其他GPU和CPU)可见
+   - 典型使用场景：
+     * 多GPU间共享的计数器
+     * CPU-GPU协同计算时的同步点
+     * 需要保证全局一致性的分布式计算
+
+2. `atomic_add_release_global`:
+   - 使用`.gpu`修饰符：仅保证当前GPU内的内存一致性
+   - 性能更高但作用域仅限于单个GPU
+   - 典型使用场景：
+     * 单个GPU内部线程间的计数器
+     * 不需要与其他GPU或CPU同步的局部原子操作
+     * 对性能要求更高且不涉及多设备协同的场景
+
+共同特点：
+- 都使用`.release`内存序：确保之前的操作在该原子操作前完成
+- 都针对全局内存(`.global`)操作
+- 都执行32位整数加法(`.s32`)
+
+选择建议：
+- 需要跨设备同步 → 使用`sys`版本
+- 仅单GPU内部使用 → 使用`gpu`版本(性能更好)
+- 两者都保证了操作的原子性，但内存一致性范围不同
