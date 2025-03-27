@@ -103,3 +103,7 @@ int main() {
 
 // & "D:\workpace\miniforge\Library\nsight-compute\2025.1.1\host\target-windows-x64\nsys.exe" profile --trace=cuda "D:\code\jerrycudalearning\less_base\less9\st_na_ptx.exe"
 // & "D:\workpace\miniforge\Library\nsight-compute\2025.1.1\host\target-windows-x64\nsys.exe" stats .\report1.nsys-rep --force-export
+
+// - ST_NA_FUNC 宏定义了是否使用 no_allocate 指令
+// - 使用 asm volatile 直接嵌入PTX指令
+// - nsys 命令用于性能分析和验证PTX指令
