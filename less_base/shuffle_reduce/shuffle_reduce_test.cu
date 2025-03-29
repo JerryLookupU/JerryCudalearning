@@ -4,11 +4,18 @@
 
 
 __forceinline__ __device__ int warp_reduce_sum(int value) {
+    // 初始: 每个线程保存自己的值(1-32)
+    // 步骤1: 与相隔16的线程交换并累加(1+17, 2+18, ..., 16+32)
     value += __shfl_xor_sync(0xffffffff, value, 16);
+    // 步骤2: 与相隔8的线程交换并累加(1+9+17+25, 2+10+18+26, ..., 8+16+24+32)
     value += __shfl_xor_sync(0xffffffff, value, 8);
+    // 步骤3: 与相隔4的线程交换并累加(1+5+9+13+17+21+25+29, ..., 4+8+12+16+20+24+28+32)
     value += __shfl_xor_sync(0xffffffff, value, 4);
+    // 步骤4: 与相隔2的线程交换并累加(1+3+5+7+...+31, 2+4+6+8+...+32)
     value += __shfl_xor_sync(0xffffffff, value, 2);
+    // 步骤5: 与相隔1的线程交换并累加(1+2+3+...+32)
     value += __shfl_xor_sync(0xffffffff, value, 1);
+    // 最终: 所有线程得到总和528(1+2+...+32)
     return value;
 }
 
