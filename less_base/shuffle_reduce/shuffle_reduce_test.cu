@@ -3,9 +3,12 @@
 #include <device_launch_parameters.h>
 
 
+// 0xffff 代表16个线程 
+
 __forceinline__ __device__ int warp_reduce_sum(int value) {
     // 初始: 每个线程保存自己的值(1-32)
     // 步骤1: 与相隔16的线程交换并累加(1+17, 2+18, ..., 16+32)
+    // 注意: 每个步骤的异或操作不会重复计算，因为每次都是与不同步长的线程交换数据
     value += __shfl_xor_sync(0xffffffff, value, 16);
     // 步骤2: 与相隔8的线程交换并累加(1+9+17+25, 2+10+18+26, ..., 8+16+24+32)
     value += __shfl_xor_sync(0xffffffff, value, 8);
@@ -31,6 +34,10 @@ __forceinline__ __device__ float half_warp_reduce_max(float value) {
 
 __global__ void test_warp_reduce_sum(int* input, int* output) {
     int tid = threadIdx.x;
+    // 对int input[32]进行归约求和到一个数值中
+    // 使用warp_reduce_sum函数中的shuffle操作
+    // 通过5步异或操作逐步累加32个线程的值
+    // 最终所有线程都会得到相同的总和
     output[tid] = warp_reduce_sum(input[tid]);
     // 一个warp 通常32个线程
 }
@@ -98,8 +105,35 @@ void run_tests() {
     cudaFree(d_foutput);
 }
 
+// 示例: 对int input[32]进行归约求和
+__global__ void reduce_sum_to_single_value(int* input, int* output) {
+    int tid = threadIdx.x;
+    int sum = warp_reduce_sum(input[tid]);
+    if (tid == 0) {
+        *output = sum; // 将最终总和存入output[0]
+    }
+}
+
 int main() {
     run_tests();
     printf("All tests completed.\n");
+    
+    // 测试reduce_sum_to_single_value
+    int h_input[32], h_output;
+    int *d_input, *d_output;
+    
+    for (int i = 0; i < 32; ++i) h_input[i] = i + 1;
+    
+    cudaMalloc(&d_input, 32 * sizeof(int));
+    cudaMalloc(&d_output, sizeof(int));
+    cudaMemcpy(d_input, h_input, 32 * sizeof(int), cudaMemcpyHostToDevice);
+    
+    reduce_sum_to_single_value<<<1, 32>>>(d_input, d_output);
+    cudaMemcpy(&h_output, d_output, sizeof(int), cudaMemcpyDeviceToHost);
+    
+    printf("Reduced sum: %d (expected: 528)\n", h_output);
+    
+    cudaFree(d_input);
+    cudaFree(d_output);
     return 0;
 }
