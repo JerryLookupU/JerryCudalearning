@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <cuda_runtime.h>
 
-#define TILE_SIZE 32
+#define TILE_SIZE 16
 
 // 基本矩阵乘法（未优化共享内存）
 __global__ void matrixMulBasic(float *C, float *A, float *B, int width) {
@@ -51,8 +51,8 @@ __global__ void matrixMulShared(float *C, float *A, float *B, int width) {
 
 // 优化后的共享内存矩阵乘法（减少bank冲突）
 __global__ void matrixMulSharedOptimized(float *C, float *A, float *B, int width) {
-    __shared__ float As[TILE_SIZE][TILE_SIZE + 1];  // 添加padding避免bank冲突
-    __shared__ float Bs[TILE_SIZE][TILE_SIZE + 1];
+    __shared__ float As[TILE_SIZE][TILE_SIZE + 2];  // 增加padding进一步避免bank冲突
+    __shared__ float Bs[TILE_SIZE][TILE_SIZE + 2];
 
     int bx = blockIdx.x, by = blockIdx.y;
     int tx = threadIdx.x, ty = threadIdx.y;
@@ -89,7 +89,7 @@ void initMatrix(float *matrix, int size) {
 }
 
 int main() {
-    int width = 1024;
+    int width = 4096;
     size_t size = width * width * sizeof(float);
     
     float *h_A = (float *)malloc(size);
@@ -114,6 +114,7 @@ int main() {
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
+    cudaFuncAttributes attr;
     
     cudaEventRecord(start);
     matrixMulBasic<<<dimGrid, dimBlock>>>(d_C, d_A, d_B, width);
@@ -124,6 +125,12 @@ int main() {
     cudaEventElapsedTime(&milliseconds, start, stop);
     printf("Basic matrix multiplication: %.3f ms\n", milliseconds);
     
+    // 检查内核执行错误
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("Basic kernel error: %s\n", cudaGetErrorString(err));
+    }
+    
     // 测试共享内存矩阵乘法（可能有bank冲突）
     cudaEventRecord(start);
     matrixMulShared<<<dimGrid, dimBlock>>>(d_C, d_A, d_B, width);
@@ -133,6 +140,17 @@ int main() {
     cudaEventElapsedTime(&milliseconds, start, stop);
     printf("Shared memory matrix multiplication (potential bank conflicts): %.3f ms\n", milliseconds);
     
+    // 检查内核执行错误
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("Shared kernel error: %s\n", cudaGetErrorString(err));
+    }
+    
+    // 检查共享内存使用情况
+    int sharedMemUsed;
+    cudaFuncGetAttributes(&attr, matrixMulShared);
+    printf("Shared memory used per block: %d bytes\n", attr.sharedSizeBytes);
+    
     // 测试优化后的共享内存矩阵乘法
     cudaEventRecord(start);
     matrixMulSharedOptimized<<<dimGrid, dimBlock>>>(d_C, d_A, d_B, width);
@@ -141,6 +159,16 @@ int main() {
     
     cudaEventElapsedTime(&milliseconds, start, stop);
     printf("Optimized shared memory matrix multiplication (reduced bank conflicts): %.3f ms\n", milliseconds);
+    
+    // 检查内核执行错误
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("Optimized kernel error: %s\n", cudaGetErrorString(err));
+    }
+    
+    // 检查共享内存使用情况
+    cudaFuncGetAttributes(&attr, matrixMulSharedOptimized);
+    printf("Optimized shared memory used per block: %d bytes\n", attr.sharedSizeBytes);
     
     cudaMemcpy(h_C, d_C, size, cudaMemcpyDeviceToHost);
     
