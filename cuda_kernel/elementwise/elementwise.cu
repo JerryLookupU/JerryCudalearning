@@ -54,6 +54,26 @@ __global__ void elementwise_add_f16x2_kernel(half* a,half* b, half* c,int N){
     } 
 }
 
+__global__ void elementwise_add_pack128bits_kernel(half* a,half* b, half* c,int N){
+    // 128bits = 8x16
+    int idx = 8*(blockIdx.x * blockDim.x + threadIdx.x);
+    half pack_a[8], pack_b[8], pack_c[8];
+    LDST128BITS(pack_a[0]) = LDST128BITS(a[idx]);
+    LDST128BITS(pack_b[0]) = LDST128BITS(b[idx]);
+    // #pragma unroll
+    // for (int i = 0; i < 8; i++) {
+    //     pack_c[i] = __hadd(pack_a[i], pack_b[i]);
+    // }
+    #pragma unroll
+    for (int i = 0; i < 8; i+=2) {
+        HALF2(pack_c[i]) = __hadd2(HALF2(pack_a[i]), HALF2(pack_b[i]));
+    }
+    if ((idx+7) < N) {
+        LDST128BITS(c[idx]) = LDST128BITS(pack_c[0]);
+    }
+
+}
+
 __global__ void elementwise_add_f16x8_kernel(half* a,half* b, half* c,int N){
     int idx = 8*(blockIdx.x * blockDim.x + threadIdx.x);
     half2 reg_a_0 = HALF2(a[idx + 0]);
