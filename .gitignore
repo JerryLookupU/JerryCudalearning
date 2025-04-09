@@ -28,3 +28,7 @@ publish/
 
 *.nsys-rep
 *.sqlite
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3
