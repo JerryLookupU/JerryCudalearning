@@ -48,10 +48,48 @@ __global__ void elementwise_add_f16x2_kernel(half* a,half* b, half* c,int N){
         half2 reg_a = HALF2(a[idx]);
         half2 reg_b = HALF2(b[idx]);
         half2 reg_c;
-        reg_c.x = reg_a.x + reg_b.x;
-        reg_c.y = reg_a.y + reg_b.y;
+        reg_c.x = __hadd(reg_a.x, reg_b.x);
+        reg_c.y = __hadd(reg_a.y, reg_b.y);
         HALF2(c[idx]) = reg_c; 
     } 
+}
+
+__global__ void elementwise_add_f16x8_kernel(half* a,half* b, half* c,int N){
+    int idx = 8*(blockIdx.x * blockDim.x + threadIdx.x);
+    half2 reg_a_0 = HALF2(a[idx + 0]);
+    half2 reg_a_1 = HALF2(a[idx + 2]);
+    half2 reg_a_2 = HALF2(a[idx + 4]);
+    half2 reg_a_3 = HALF2(a[idx + 6]);
+
+    half2 reg_b_0 = HALF2(b[idx + 0]);
+    half2 reg_b_1 = HALF2(b[idx + 2]);
+    half2 reg_b_2 = HALF2(b[idx + 4]);
+    half2 reg_b_3 = HALF2(b[idx + 6]);
+    
+    half2 reg_c_0,reg_c_1,reg_c_2,reg_c_3;
+    reg_c_0.x = __hadd(reg_a_0.x, reg_b_0.x);
+    reg_c_0.y = __hadd(reg_a_0.y, reg_b_0.y);
+    reg_c_1.x = __hadd(reg_a_1.x, reg_b_1.x);
+    reg_c_1.y = __hadd(reg_a_1.y, reg_b_1.y);
+    reg_c_2.x = __hadd(reg_a_2.x, reg_b_2.x);
+    reg_c_2.y = __hadd(reg_a_2.y, reg_b_2.y);
+    reg_c_3.x = __hadd(reg_a_3.x, reg_b_3.x);
+    reg_c_3.y = __hadd(reg_a_3.y, reg_b_3.y);
+
+    if (idx < N) {
+        HALF2(c[idx + 0]) = reg_c_0;
+    }
+    if ((idx + 2) < N) {
+        HALF2(c[idx + 2]) = reg_c_1;
+    }
+    if ((idx + 4) < N) {
+        HALF2(c[idx + 4]) = reg_c_2;
+   
+    }
+    if ((idx + 6) < N) {
+        HALF2(c[idx + 6]) = reg_c_3; 
+    }
+
 }
 
 
@@ -141,6 +179,18 @@ int main() {
     
     cudaEventElapsedTime(&milliseconds, start, stop);
     std::cout << "f16x2 kernel time: " << milliseconds << " ms" << std::endl;
+    
+    // Test f16x8 kernel
+    dim3 block8(32);  // 256 threads / 8 elements per thread
+    dim3 grid8((N + block8.x * 8 - 1) / (block8.x * 8));
+    
+    cudaEventRecord(start);
+    elementwise_add_f16x8_kernel<<<grid8, block8>>>(d_half_a, d_half_b, d_half_c, N);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    std::cout << "f16x8 kernel time: " << milliseconds << " ms" << std::endl;
 
     // Cleanup
     cudaFree(d_a);
