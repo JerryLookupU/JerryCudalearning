@@ -212,6 +212,16 @@ int main() {
     cudaEventElapsedTime(&milliseconds, start, stop);
     std::cout << "f16x8 kernel time: " << milliseconds << " ms" << std::endl;
 
+    cudaEventRecord(start);
+    elementwise_add_pack128bits_kernel<<<grid8, block8>>>(d_half_a, d_half_b, d_half_c, N);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    std::cout << "pack f16x8 kernel time: " << milliseconds << " ms" << std::endl;
+
+
+
     // Cleanup
     cudaFree(d_a);
     cudaFree(d_b);
