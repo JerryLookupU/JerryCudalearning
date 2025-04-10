@@ -51,7 +51,7 @@ __global__ void matrixMulShared(float *C, float *A, float *B, int width) {
 
 // 优化后的共享内存矩阵乘法（减少bank冲突）
 __global__ void matrixMulSharedOptimized(float *C, float *A, float *B, int width) {
-    __shared__ float As[TILE_SIZE][TILE_SIZE + 2];  // 增加padding进一步避免bank冲突
+    __shared__ float As[TILE_SIZE][TILE_SIZE + 2]; 
     __shared__ float Bs[TILE_SIZE][TILE_SIZE + 2];
 
     int bx = blockIdx.x, by = blockIdx.y;

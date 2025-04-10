@@ -49,7 +49,7 @@ int main() {
     cudaMemcpy(d_a, a, size_a, cudaMemcpyHostToDevice);
     cudaMemcpy(d_b, b, size_b, cudaMemcpyHostToDevice);
     cudaMemcpy(d_c, c, size_c, cudaMemcpyHostToDevice);
-    dim3 block(4, 4);
+    dim3 block(2,2);
     dim3 grid((ncol + block.x - 1) / block.x, (nrow + block.y - 1) / block.y);
     view_matrix<<<grid, block>>>(d_a, d_b, d_c, nrow, ncol, mrow, mcol);
     cudaMemcpy(c, d_c, size_c, cudaMemcpyDeviceToHost);
