@@ -79,6 +79,59 @@ __global__ void sigmoid_fp16x2_kernel(half* x,half* y, int N){
     if ((idx + 0) < N) {HALF2(y[idx + 0]) = reg_y;}
 }
 
+__global__void sigmoid_fp16x8_kernel(half* x,half* y, int N){
+    int idx = 8*(blockIdx.x * blockDim.x + threadIdx.x);
+    const half f = __float2half(1.0f);
+    half2 reg_x1 = HALF2(x[idx]); 
+    half2 reg_x2 = HALF2(x[idx + 2]);
+    half2 reg_x3 = HALF2(x[idx + 4]);
+    half2 reg_x4 = HALF2(x[idx + 6]);
+
+    half2 reg_y1;
+    half2 reg_y2;
+    half2 reg_y3;
+    half2 reg_y4;
+
+    reg_y1.x = __hmin(__hmax(reg_x1.x,MAX_EXP_F16), MIN_EXP_F16);
+    reg_y1.y = __hmin(__hmax(reg_x1.y,MAX_EXP_F16), MIN_EXP_F16);
+    reg_y2.x = __hmin(__hmax(reg_x2.x,MAX_EXP_F16), MIN_EXP_F16);
+    reg_y2.y = __hmin(__hmax(reg_x2.y,MAX_EXP_F16), MIN_EXP_F16);
+    reg_y3.x = __hmin(__hmax(reg_x3.x,MAX_EXP_F16), MIN_EXP_F16);
+    reg_y3.y = __hmin(__hmax(reg_x3.y,MAX_EXP_F16), MIN_EXP_F16);
+    reg_y4.x = __hmin(__hmax(reg_x4.x,MAX_EXP_F16), MIN_EXP_F16);
+    reg_y4.y = __hmin(__hmax(reg_x4.y,MAX_EXP_F16), MIN_EXP_F16);
+
+    reg_y1.x = f / (f + hexp(-reg_y1.x));
+    reg_y1.y = f / (f + hexp(-reg_y1.y));
+    reg_y2.x = f / (f + hexp(-reg_y2.x));
+    reg_y2.y = f / (f + hexp(-reg_y2.y));
+    reg_y3.x = f / (f + hexp(-reg_y3.x));
+    reg_y3.y = f / (f + hexp(-reg_y3.y));
+    reg_y4.x = f / (f + hexp(-reg_y4.x));
+    reg_y4.y = f / (f + hexp(-reg_y4.y));
+
+    if ((idx + 0) < N) {HALF2(y[idx + 0]) = reg_y1; }
+    if ((idx + 2) < N) {HALF2(y[idx + 2]) = reg_y2; }
+    if ((idx + 4) < N) {HALF2(y[idx + 4]) = reg_y3; }
+    if ((idx + 6) < N) {HALF2(y[idx + 6]) = reg_y4; }
+
+}
+
+__global__ void sigmoid_fp16x8_pack_kernel(half* x,half* y, int N){
+    int idx = 8*(blockIdx.x * blockDim.x + threadIdx.x);
+    const half f = __float2half(1.0f);
+    half pack_x[8], pack_y[8];
+    LDST128BITS(pack_x[0]) = LDST128BITS(x[idx]);
+    #pragma unroll
+    for (int i = 0; i < 8; i++) {
+        half v = __hmin(__hmax(pack_x[i],MAX_EXP_F16), MIN_EXP_F16);
+        pack_y[i] = f / (f + hexp(-v));
+    }
+    if ((idx + 7) < N) {
+        LDST128BITS(y[idx]) = LDST128BITS(pack_y[0]);
+    }
+
+}
 
 
 void test_sigmoid() {
@@ -157,7 +210,23 @@ void test_sigmoid() {
     cudaEventElapsedTime(&milliseconds, start, stop);
     printf("Sigmoid fp32x4 kernel execution time: %f ms\n", milliseconds);
 
+    dim3 block8(64);
+    dim3 grid8((N + block.x*8 - 1) / block.x*8);
+    milliseconds = 0.0f;
+    cudaEventRecord(start);
+    sigmoid_fp16x8_kernel<<<grid8, block8>>>(d_a_half, d_b_half, N);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("Sigmoid fp16x8 kernel execution time: %f ms\n", milliseconds);
 
+
+    cudaEventRecord(start);
+    sigmoid_fp16x8_pack_kernel<<<grid8, block8>>>(d_a_half, d_b_half, N);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("Sigmoid fp16x8_pack kernel execution time: %f ms\n", milliseconds);
     // 验证结果
     float *h_y = (float *)malloc(N * sizeof(float));
     cudaMemcpy(h_y, d_y, N * sizeof(float), cudaMemcpyDeviceToHost);
