@@ -100,8 +100,10 @@ void test_relu(){
     
     // 生成测试数据
     float *h_a = (float *)malloc(N * sizeof(float));
+    half *h_a_f16 = (half *)malloc(N * sizeof(half));
     for (int i = 0; i < N; i++) {
         h_a[i] = (float)rand() / RAND_MAX * 10.0f - 5.0f; // 生成-5到5之间的随机数
+        h_a_f16[i] = __float2half(h_a[i]);
     }
     
     cudaEvent_t start, stop;
@@ -110,13 +112,17 @@ void test_relu(){
     
     // 分配设备内存
     float *d_a, *d_y;
+    half *d_a_f16, *d_y_f16;
     cudaMalloc(&d_a, N * sizeof(float));
     cudaMalloc(&d_y, N * sizeof(float));
+    cudaMalloc(&d_a_f16, N * sizeof(half));
+    cudaMalloc(&d_y_f16, N * sizeof(half));
     
     // 拷贝数据到设备
     cudaMemcpy(d_a, h_a, N * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_a_f16, h_a_f16, N * sizeof(half), cudaMemcpyHostToDevice);
 
-    // 调用核函数
+    // 测试 f32 kernel
     dim3 block(256);
     dim3 grid((N + block.x - 1) / block.x);
     float milliseconds = 0.0f;
@@ -125,35 +131,78 @@ void test_relu(){
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
-    printf("ReLU kernel execution time: %f ms\n", milliseconds);
+    printf("ReLU kernel f32 execution time: %f ms\n", milliseconds);
+
+    // 测试 f32x4 kernel
+    dim3 block_x4(64);  // 256/4
+    dim3 grid_x4((N + block_x4.x * 4 - 1) / (block_x4.x * 4));
+    cudaEventRecord(start);
+    relu_f32x4_kernel<<<grid_x4, block_x4>>>(d_a, d_y, N);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("ReLU kernel f32x4 execution time: %f ms\n", milliseconds);
+
+    // 测试 f16 kernel
+    cudaEventRecord(start);
+    relu_f16_kernel<<<grid, block>>>(d_a_f16, d_y_f16, N);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("ReLU kernel f16 execution time: %f ms\n", milliseconds);
+
+    // 测试 f16x2 kernel
+    dim3 block_f16x2(128);  // 256/2
+    dim3 grid_f16x2((N + block_f16x2.x * 2 - 1) / (block_f16x2.x * 2));
+    cudaEventRecord(start);
+    relu_f16x2_kernel<<<grid_f16x2, block_f16x2>>>(d_a_f16, d_y_f16, N);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("ReLU kernel f16x2 execution time: %f ms\n", milliseconds);
 
     // 验证结果
     float *h_y = (float *)malloc(N * sizeof(float));
+    half *h_y_f16 = (half *)malloc(N * sizeof(half));
     cudaMemcpy(h_y, d_y, N * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_y_f16, d_y_f16, N * sizeof(half), cudaMemcpyDeviceToHost);
     
     // 计算CPU结果
     float *h_y_cpu = (float *)malloc(N * sizeof(float));
+    half *h_y_cpu_f16 = (half *)malloc(N * sizeof(half));
     for (int i = 0; i < N; i++) {
         h_y_cpu[i] = fmaxf(0.0f, h_a[i]);
+        h_y_cpu_f16[i] = __hmax(__float2half(0.0f), h_a_f16[i]);
     }
     
     // 比较结果
     float max_error = 0.0f;
+    float max_error_f16 = 0.0f;
     for (int i = 0; i < N; i++) {
         float error = fabs(h_y[i] - h_y_cpu[i]);
         if (error > max_error) {
             max_error = error;
         }
+        float error_f16 = fabs(__half2float(h_y_f16[i]) - __half2float(h_y_cpu_f16[i]));
+        if (error_f16 > max_error_f16) {
+            max_error_f16 = error_f16;
+        }
     }
-    printf("Max error: %f\n", max_error);
+    printf("FP32 Max error: %f\n", max_error);
+    printf("FP16 Max error: %f\n", max_error_f16);
     printf("ReLU test passed!\n");
     
     // 释放资源
     free(h_a);
+    free(h_a_f16);
     free(h_y);
+    free(h_y_f16);
     free(h_y_cpu);
+    free(h_y_cpu_f16);
     cudaFree(d_a);
     cudaFree(d_y);
+    cudaFree(d_a_f16);
+    cudaFree(d_y_f16);
 }
 
 int main(){
