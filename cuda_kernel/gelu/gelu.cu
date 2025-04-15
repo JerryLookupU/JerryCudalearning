@@ -7,6 +7,7 @@
 #include <cuda_fp16.h>
 #include <cuda_bf16.h>
 #include <cuda_fp8.h>
+#include <math.h>
 
 
 #define WARP_SIZE 32
@@ -20,7 +21,10 @@
 
 #define MAX_EXP_F16 __float2half(11.089866488461016f)
 #define MIN_EXP_F16 __float2half(-9.704060527839234f)
-#define SQRT_2_PI   M_SQRT2 * M_2_SQRTPI * 0.5ff
+#define M_SQRT2 1.41421356237309504880f
+#define M_2_SQRTPI 1.12837916709551257390f
+#define M_SQRT1_2 0.70710678118654752440f  // 1/sqrt(2)
+#define SQRT_2_PI   M_SQRT2 * M_2_SQRTPI * 0.5f
 #define HALF_1 __float2half(1.0f)
 #define HALF_2 __float2half(2.0f)
 #define HALF_DIV2 __float2half(0.5f)
@@ -51,7 +55,7 @@
 //   return x * cdf
 // 近似版本
 __inline__ __device__ float gelu_tanh_approximate(float x) {
-    return 0.5f * (1.0f + tanhf(SQRT_2_PI * (x + 0.044715f * (x * x * x))))
+    return 0.5f * (1.0f + tanhf(SQRT_2_PI * (x + 0.044715f * (x * x * x))));
 }
 
 // tanh --> 1 - 2/(1+exp(2x))
@@ -60,13 +64,13 @@ __inline__ __device__ float gelu_tanh_approximate(float x) {
 __inline__ __device__ half gelu_tanh_approximate(half x) {
     half cube = x * x * x;
     half inner = HALF_SQRT_2_PI * (x + HALF_V_APP * cube);
-    return HALF_DIV2 * x * (HALF_1 + (hexp(inner * HALF_2) - HALF_1) / (hexp(inner * HALF_2) + HALF_1));
+    return HALF_DIV2 * x * (HALF_1 + ((hexp(inner * HALF_2) - HALF_1) / (hexp(inner * HALF_2) + HALF_1)));
 }
 
 __inline__ __device__ half gelu_tanh_approximate_v2(half x) {
     half cube = x * x * x;
     half inner = HALF_SQRT_2_PI * (x + HALF_V_APP * cube);
-    return HALF_DIV2 * x * (HALF_2 - ( HALF_2 / (hexp(inner * HALF_2) + HALF_1));
+    return HALF_DIV2 * x * (HALF_2 - HALF_2 / (hexp(inner * HALF_2) + HALF_1));
 }
 
 
@@ -74,7 +78,7 @@ __inline__ __device__ half gelu_tanh_approximate_v2(half x) {
 // def gelu(x):
 //     return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
 // 不要用 除 sqrt 计算尽量使用乘法 /sqrt(2.0) ==> 1/sqrt(2.0)
-__inline__ device__ float gelu(float x) {
+__inline__ __device__ float gelu(float x) {
     return x * 0.5f * (1.0f + erff(x * M_SQRT1_2));
 }
 
@@ -102,7 +106,7 @@ __global__ void gelu_fp32x4_kernel(float* input, float* output, int n) {
     reg_y.y = GELU_OPS(reg_x.y);
     reg_y.z = GELU_OPS(reg_x.z);
     reg_y.w = GELU_OPS(reg_x.w);;
-    if (idx < n) {
+    if (tid < n) {
         FLOAT4(output[tid]) = reg_y;
     }
 }
@@ -125,7 +129,7 @@ __global__ void gelu_fp16x2_kernel(half* input, half* output, int n) {
     reg_x.y = __hmax(__hmin(reg_x.y, MAX_EXP_F16), MIN_EXP_F16);
     reg_y.x = HALF_GELU_OPS(reg_x.x);
     reg_y.y = HALF_GELU_OPS(reg_x.y);
-    if (idx < n) {
+    if (tid < n) {
         HALF2(output[tid]) = reg_y; 
     }
 }
@@ -138,7 +142,7 @@ __global__ void gelu_fp16x2_kernel_v2(half* input, half* output, int n) {
     reg_x.y = __hmax(__hmin(reg_x.y, MAX_EXP_F16), MIN_EXP_F16);
     reg_y.x = HALF_GELU_OPS_V2(reg_x.x);
     reg_y.y = HALF_GELU_OPS_V2(reg_x.y);
-    if (idx < n) {
+    if (tid < n) {
         HALF2(output[tid]) = reg_y; 
     }
 }
@@ -170,16 +174,16 @@ __global__ void gelu_fp16x8_kernel(half* input, half* output, int n) {
     reg_y_3.x = HALF_GELU_OPS(reg_x_3.x);
     reg_y_3.y = HALF_GELU_OPS(reg_x_3.y);
 
-    if ((idx + 0) < n) {
+    if ((tid + 0) < n) {
         HALF2(output[tid + 0]) = reg_y_0; 
     }
-    if ((idx + 2) < n) {
+    if ((tid + 2) < n) {
         HALF2(output[tid + 2]) = reg_y_1; 
     }
-    if ((idx + 4) < n) {
+    if ((tid + 4) < n) {
         HALF2(output[tid + 4]) = reg_y_2;
     }
-    if ((idx + 6) < n) {
+    if ((tid + 6) < n) {
         HALF2(output[tid + 6]) = reg_y_3; 
     }
 }
@@ -210,16 +214,16 @@ __global__ void gelu_fp16x8_kernel_V2(half* input, half* output, int n) {
     reg_y_3.x = HALF_GELU_OPS_V2(reg_x_3.x);
     reg_y_3.y = HALF_GELU_OPS_V2(reg_x_3.y);
 
-    if ((idx + 0) < n) {
+    if ((tid + 0) < n) {
         HALF2(output[tid + 0]) = reg_y_0; 
     }
-    if ((idx + 2) < n) {
+    if ((tid + 2) < n) {
         HALF2(output[tid + 2]) = reg_y_1; 
     }
-    if ((idx + 4) < n) {
+    if ((tid + 4) < n) {
         HALF2(output[tid + 4]) = reg_y_2;
     }
-    if ((idx + 6) < n) {
+    if ((tid + 6) < n) {
         HALF2(output[tid + 6]) = reg_y_3; 
     }
 }
@@ -235,7 +239,7 @@ __global__ void gelu_fp16x8_pack_kernel(half* input, half* output, int n) {
         pack_y[i] = HALF_GELU_OPS(v);
     }
 
-    for ((idx + 7) < n) {
+    if ((tid + 7) < n) {
         LDST128BITS(output[tid]) = LDST128BITS(pack_y[0]);
     }
 }
@@ -250,7 +254,7 @@ __global__ void gelu_fp16x8_pack_kernel_V2(half* input, half* output, int n) {
         pack_y[i] = HALF_GELU_OPS_V2(v);
     }
 
-    for ((idx + 7) < n) {
+    if ((tid + 7) < n) {
         LDST128BITS(output[tid]) = LDST128BITS(pack_y[0]);
     }
 }
