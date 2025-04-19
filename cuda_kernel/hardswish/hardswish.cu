@@ -57,7 +57,7 @@ __global__ void hardswish_fp32_kernel(float x, float* y,int N) {
 
 __global__ void hardswish_fp32x4_kernel(float *x, float* y,int N) {
     int idx = 4*(blockIdx.x * blockDim.x + threadIdx.x);
-    if idx < N) {
+    if (idx < N) {
         FLOAT4 reg_x = FLOAT4(x[idx]);
         FLOAT4 reg_y;
         reg_y.x = hardswish(reg_x.x);
