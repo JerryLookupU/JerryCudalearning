@@ -72,6 +72,41 @@ __global__ void matrix_transpose_fp32x4_row2col_kernel(float *x,float *y,int row
     }
 }
 
+
+__global__ void matrix_transpose_fp32_diag2d_kernel(float *x,float *y,int row,int col){
+    const int block_y = blockIdx.x;
+    const int block_x = (blockIdx.y + blockIdx.x) % gridDim.x;
+    const int global_col = block_x * blockDim.x + threadIdx.x;
+    const int global_row = block_y * blockDim.y + threadIdx.y;
+//   const int block_y = blockIdx.x;
+//   const int block_x = (blockIdx.x + blockIdx.y) % gridDim.x;
+//   const int global_col = threadIdx.x + blockDim.x * block_x;
+//   const int global_row = threadIdx.y + blockDim.y * block_y;
+
+    if (global_col < col && global_row < row){
+        y[global_row * col + global_col] = x[global_col * row + global_row];
+    }
+}
+
+__global__ void mat_transpose_f32_col2row2d_kernel(float *x, float *y, const int row, const int col) {
+  const int global_x = blockIdx.x * blockDim.x + threadIdx.x;
+  const int global_y = blockIdx.y * blockDim.y + threadIdx.y;
+  if (global_x < col && global_y < row) {
+    y[global_x * row + global_y] = x[global_y * col + global_x];
+  }
+}
+
+__global__ void mat_transpose_f32_row2col2d_kernel(float *x, float *y, const int row, const int col) {
+    // row2col2d 等价于 col2row2d
+  const int global_y = blockIdx.x * blockDim.x + threadIdx.x;
+  const int global_x = blockIdx.y * blockDim.y + threadIdx.y;
+  if (global_y < col && global_x < row) {
+    y[global_y * row + global_x] = x[global_x * col + global_y];
+  }
+}
+
+
+
 void test_matrix_transpose() {
     const int ROW = 32;
     const int COL = 32;
@@ -134,6 +169,35 @@ void test_matrix_transpose() {
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&milliseconds, start, stop);
     printf("Matrix transpose row2col x4 kernel execution time: %f ms\n", milliseconds);
+
+    // 调用核函数 - diag2d
+    dim3 block2d(16, 16);
+    dim3 grid2d((COL + block2d.x - 1) / block2d.x, (ROW + block2d.y - 1) / block2d.y);
+    milliseconds = 0.0f;
+    cudaEventRecord(start);
+    matrix_transpose_fp32_diag2d_kernel<<<grid2d, block2d>>>(d_a, d_y, ROW, COL);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("Matrix transpose diag2d kernel execution time: %f ms\n", milliseconds);
+
+    // 调用核函数 - col2row2d
+    milliseconds = 0.0f;
+    cudaEventRecord(start);
+    mat_transpose_f32_col2row2d_kernel<<<grid2d, block2d>>>(d_a, d_y, ROW, COL);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("Matrix transpose col2row2d kernel execution time: %f ms\n", milliseconds);
+
+    // 调用核函数 - row2col2d
+    milliseconds = 0.0f;
+    cudaEventRecord(start);
+    mat_transpose_f32_row2col2d_kernel<<<grid2d, block2d>>>(d_a, d_y, ROW, COL);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("Matrix transpose row2col2d kernel execution time: %f ms\n", milliseconds);
 
     // 验证结果
     float *h_y = (float *)malloc(N * sizeof(float));
