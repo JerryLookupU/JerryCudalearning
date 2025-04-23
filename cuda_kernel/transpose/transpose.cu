@@ -105,6 +105,37 @@ __global__ void mat_transpose_f32_row2col2d_kernel(float *x, float *y, const int
   }
 }
 
+__global__ void mat_transpose_fp32x4_col2row2d_kernel(float *x, float *y, const int row, const int col) {
+    // 列优先存储 转成 行优先存储
+    const int global_x = blockIdx.x * blockDim.x + threadIdx.x;  
+    const int global_y = blockIdx.y * blockDim.y + threadIdx.y; 
+    // fp32 == FLOAT4
+    if ((global_x*4 + 3) < row && global_y < col) {
+        float4 reg_x = reinterpret_cast<float4 *>(x)[global_y * col / 4 + global_x];
+        y[(global_x*4) * row + global_y] = reg_x.x;
+        y[(global_x*4 + 1) * row + global_y] = reg_x.y;
+        y[(global_x*4 + 2) * row + global_y] = reg_x.z;
+        y[(global_x*4 + 3) * row + global_y] = reg_x.w;
+    }
+}
+// x 是列优先存储 y是 行优先存储 
+// x是 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+// y 是 1 5 9 13 2 6 10 14 3 7 11 15 4 8 12 16
+
+__global__ void mat_transpose_fp32x4_row2col2d_kernel(float *x, float *y, const int row, const int col) {
+    const int global_x = blockIdx.x * blockDim.x + threadIdx.x; 
+    const int global_y = blockIdx.y * blockDim.y + threadIdx.y;
+    // fp32 == FLOAT4
+    if ((global_y*4 + 3) < row && global_x < col) {
+        float4 reg_y;
+        reg_y.x = x[(global_y*4) * col + global_x];
+        reg_y.y = x[(global_y*4 + 1) * col + global_x];
+        reg_y.z = x[(global_y*4 + 2) * col + global_x];
+        reg_y.w = x[(global_y*4 + 3) * col + global_x];
+        reinterpret_cast<float4 *>(y)[global_x * row / 4 + global_y] = FLOAT4(reg_y);
+    }
+
+}
 
 
 void test_matrix_transpose() {
